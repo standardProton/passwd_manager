@@ -3,6 +3,8 @@ from cryptography.fernet import Fernet
 from getpass import getpass
 
 HELP_STR = "Commands: --set, --get, --print, --list, --delete"
+OS = "windows" #valid: 'windows', 'linux', 'mac'
+SECURITY_CHARS = 0 #the number of chars at the end of pw to print to console, rather than entire password put onto clipboard
 
 def readSalt() -> str:
     if (isFileEmpty('salt')):
@@ -27,8 +29,6 @@ def openPasswords(fernet) -> dict:
             except Exception as ex: return None
 
 def writePasswords(vals: dict, fernet: Fernet):
-    print("write:")
-    print(json.dumps(vals))
     encrypted = fernet.encrypt(json.dumps(vals).encode('utf-8')).decode()
     with open('pwstore', 'w') as f: f.write(encrypted)
 
@@ -49,13 +49,23 @@ def getFernet(nacl, pw):
     return Fernet(base64.urlsafe_b64encode(bytes.fromhex(pwhash)[0:32]))
 
 def setClipboard(s: str):
-    subprocess.check_call('echo %s | clip' % s, shell=True)
+    cmd = None
+    if (OS == 'linux'): cmd = 'echo -n %s| xclip'
+    elif (OS == 'mac'): cmd = 'echo %s| pbcopy'
+    else: cmd = 'echo | set /p=%s|clip'
+    subprocess.check_call(cmd % s.strip(), shell=True)
 
 def printPw(key, vals, copy=True):
     if (key in vals): 
         if (copy):
-            setClipboard(vals[key])
-            print("Password copied to clipboard!")
+            if (SECURITY_CHARS <= 0):
+                setClipboard(vals[key])
+                print("Password copied to clipboard!")
+            else:
+                copy_chars = vals[key][:-SECURITY_CHARS]
+                end_chars = vals[key][-SECURITY_CHARS:]
+                setClipboard(copy_chars)
+                print("Paste first portion, THEN type: %s" % end_chars)
         else: print(vals[key])
     else: print("Unknown site name")
 
@@ -88,22 +98,31 @@ if __name__ == "__main__":
         args = sys.argv[1:] if with_sysargs else input("> ").split(" ")
         first = False
         if (len(args) == 0): continue
-        args[0] = args[0].lower()
+        args[0] = args[0].lower().replace('--', '')
 
-        if (args[0] == 'list' or args[0] == '--list'):
+        if (args[0] == 'list'):
             keys = vals.keys()
             print("%s Password key(s):" % len(keys))
             for key in keys: print("- %s" % key)
-        # elif (args[0] == 'set'):
-        #     if (len(args) == 2): print("Format: set <name> <new password>")
-        elif (args[0] == '--get' or args[0] == 'get'): printPw(args[1].lower(), vals, copy=True)
-        elif (args[0] == '--print' or args[0] == 'print'): printPw(args[1].lower(), vals, copy=False)
-        elif (args[0] == '--set' or args[0] == 'set'):
-            if (len(args) < 3): print("Usage: set <name> <new password>")
-            else:
-                key = args[1].lower()
-                
+        elif (args[0] == 'get'): printPw(args[1].lower(), vals, copy=True)
+        elif (args[0] == 'print'): printPw(args[1].lower(), vals, copy=False)
+        elif (args[0] == 'set' or args[0] == 'put'):
+            if (len(args) < 3): 
+                print("Usage: set <name> <new password>")
+                continue
+            key = args[1].lower()
+            pw = args[2]
+            if not with_sysargs: pw = ' '.join(args[2:]).strip() #concat all args if using built-in shell
+            vals[key] = pw
+            writePasswords(vals, fernet)
+            print("Set password for %s!" % key)
+        elif (args[0] == 'delete' or args[0] == 'del'):
+            if (len(args) < 2): 
+                print("Usage: del <name>")
+                continue
+            key = args[1].lower()
+            del vals[key]
+            writePasswords(vals, fernet)
+            print("Deleted %s!" % key)
         else: printPw(args[0].lower(), vals, copy=True)
-        
-    print("vals:")
-    print(vals)
+        print('')
