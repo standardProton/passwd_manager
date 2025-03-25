@@ -1,10 +1,9 @@
-import os, hashlib, base64, random, json, time, subprocess, sys
+import os, hashlib, base64, random, json, sys, pyperclip
 from cryptography.fernet import Fernet
 from getpass import getpass
 
-HELP_STR = "Commands: --set, --get, --print, --list, --delete"
-OS = "windows" #valid: 'windows', 'linux', 'mac'
-SECURITY_CHARS = 0 #the number of chars at the end of pw to print to console, rather than entire password put onto clipboard
+HELP_STR = "Commands: set, get, print, list, comment, delete"
+SECURITY_CHARS = 0 #the number of chars at the end of pw to print to console, rather than entire password put onto clipboard (recommended no more than 3)
 
 def readSalt() -> str:
     if (isFileEmpty('salt')): #generate new salt
@@ -48,26 +47,40 @@ def getFernet(nacl, pw):
     pwhash = hashlib.sha256(base64.b64encode((nacl + pw).encode('utf-8'))).hexdigest()
     return Fernet(base64.urlsafe_b64encode(bytes.fromhex(pwhash)[0:32]))
 
-def setClipboard(s: str):
-    cmd = None
-    if (OS == 'linux'): cmd = 'echo -n %s| xclip'
-    elif (OS == 'mac'): cmd = 'echo -n %s| pbcopy' #TODO: test this on a mac or vm
-    else: cmd = 'echo | set /p=%s|clip'
-    subprocess.check_call(cmd % s.strip(), shell=True)
+def getPassword(key, vals):
+    password, comments = None, None
+    if (key in vals):
+        if (isinstance(vals[key], dict)): 
+            if ('password' in vals[key]): password = vals[key]['password']
+            else: print("Malformatted key store for %s!" % key)
+            if ('comment' in vals[key]): comments = vals[key]['comment']
+        elif (isinstance(vals[key], str)): password = vals[key] #fallback
+    return password, comments
 
 def printPw(key, vals, copy=True):
     if (key in vals): 
+        password, comments = getPassword(key, vals)
+        if (comments is not None): print("Comment: %s" % comments)
         if (copy):
             if (SECURITY_CHARS <= 0):
-                setClipboard(vals[key])
+                pyperclip.copy(password)
                 print("Password copied to clipboard!")
             else:
-                copy_chars = vals[key][:-SECURITY_CHARS]
-                end_chars = vals[key][-SECURITY_CHARS:]
-                setClipboard(copy_chars)
+                copy_chars = password[:-SECURITY_CHARS]
+                end_chars = password[-SECURITY_CHARS:]
+                pyperclip.copy(copy_chars)
                 print("Paste first portion, THEN type: %s" % end_chars)
-        else: print(vals[key])
+        else: print(password)
     else: print("Unknown site name")
+
+def setComment(key, comment, vals):
+    if not (key in vals): return
+    password, old_comments = getPassword(key, vals)
+    vals[key] = {
+        'password': password,
+        'comment': comment
+    }
+    return vals, old_comments
 
 if __name__ == "__main__":
     with_sysargs = len(sys.argv) > 1
@@ -87,11 +100,10 @@ if __name__ == "__main__":
             if (confirm == "y" or confirm == "yes"):
                 fernet = getFernet(nacl, pw)
                 break
-    else: vals, fernet = tryPassword(nacl)
-
-    if (not with_sysargs): 
-        print("Password accepted!")
-        print(HELP_STR)
+    else: 
+        vals, fernet = tryPassword(nacl)
+        if (not with_sysargs): print("Password accepted!")
+    if (not with_sysargs): print(HELP_STR)
     first = True
 
     while first or not with_sysargs:
@@ -106,6 +118,7 @@ if __name__ == "__main__":
             for key in keys: print("- %s" % key)
         elif (args[0] == 'get'): printPw(args[1].lower(), vals, copy=True)
         elif (args[0] == 'print'): printPw(args[1].lower(), vals, copy=False)
+
         elif (args[0] == 'set' or args[0] == 'put'):
             if (len(args) < 3): 
                 print("Usage: set <name> <new password>")
@@ -113,9 +126,29 @@ if __name__ == "__main__":
             key = args[1].lower()
             pw = args[2]
             if not with_sysargs: pw = ' '.join(args[2:]).strip() #concat all args if using built-in shell
-            vals[key] = pw
+            old_pw, comment = getPassword(key, vals)
+            vals[key] = {
+                'password': pw,
+                'comment': comment
+            }
             writePasswords(vals, fernet)
-            print("Set password for %s!" % key)
+            print("Successfully set password for %s!" % key)
+
+        elif (args[0] == 'comment'):
+            if (len(args) < 3): 
+                print("Usage: comment <name> <comment>")
+                continue
+            key = args[1].lower()
+            if not (key in vals): 
+                print("Unknown site name '%s'" % key)
+                continue
+            comment = args[2]
+            if (not with_sysargs): comment = ' '.join(args[2:]).strip()
+            vals, old_comment = setComment(key, comment, vals)
+            writePasswords(vals, fernet)
+            if (old_comment is not None): print("Old comment for %s: %s" % (key, old_comment))
+            print("New comment for %s: %s" % (key, comment))
+
         elif (args[0] == 'delete' or args[0] == 'del'):
             if (len(args) < 2): 
                 print("Usage: del <name>")
@@ -124,6 +157,7 @@ if __name__ == "__main__":
             del vals[key]
             writePasswords(vals, fernet)
             print("Deleted %s!" % key)
+        
         elif (args[0] == 'exit' or args[0] == 'quit'): break
         else: printPw(args[0].lower(), vals, copy=True)
         print('')
