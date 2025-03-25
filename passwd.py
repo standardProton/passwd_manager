@@ -51,7 +51,7 @@ def getFernet(nacl, pw):
 def setClipboard(s: str):
     cmd = None
     if (OS == 'linux'): cmd = 'echo -n %s| xclip'
-    elif (OS == 'mac'): cmd = 'echo %s| pbcopy'
+    elif (OS == 'mac'): cmd = 'echo -n %s| pbcopy' #TODO: test this on a mac or vm
     else: cmd = 'echo | set /p=%s|clip'
     subprocess.check_call(cmd % s.strip(), shell=True)
 
@@ -124,5 +124,6 @@ if __name__ == "__main__":
             del vals[key]
             writePasswords(vals, fernet)
             print("Deleted %s!" % key)
+        elif (args[0] == 'exit' or args[0] == 'quit'): break
         else: printPw(args[0].lower(), vals, copy=True)
         print('')
