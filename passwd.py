@@ -7,7 +7,7 @@ OS = "windows" #valid: 'windows', 'linux', 'mac'
 SECURITY_CHARS = 0 #the number of chars at the end of pw to print to console, rather than entire password put onto clipboard
 
 def readSalt() -> str:
-    if (isFileEmpty('salt')):
+    if (isFileEmpty('salt')): #generate new salt
         alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890'
         salt = ''.join([alphabet[random.randint(0, len(alphabet)-1)] for _ in range(32)])
         with open('salt', 'w') as f: f.write(salt + "\n### DO NOT CHANGE ###")
@@ -102,7 +102,7 @@ if __name__ == "__main__":
 
         if (args[0] == 'list'):
             keys = vals.keys()
-            print("%s Password key(s):" % len(keys))
+            print("%s password key(s):" % len(keys))
             for key in keys: print("- %s" % key)
         elif (args[0] == 'get'): printPw(args[1].lower(), vals, copy=True)
         elif (args[0] == 'print'): printPw(args[1].lower(), vals, copy=False)
