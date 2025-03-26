@@ -110,7 +110,7 @@ if __name__ == "__main__":
         args = sys.argv[1:] if with_sysargs else input("> ").split(" ")
         first = False
         if (len(args) == 0): continue
-        args[0] = args[0].lower().replace('--', '')
+        args[0] = args[0].lower().replace('-', '')
 
         if (args[0] == 'list'):
             keys = vals.keys()
