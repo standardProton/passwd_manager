@@ -2,8 +2,17 @@ import os, hashlib, base64, random, json, sys, pyperclip
 from cryptography.fernet import Fernet
 from getpass import getpass
 
-HELP_STR = "Commands: set, get, print, list, comment, delete"
 SECURITY_CHARS = 0 #the number of chars at the end of pw to print to console, rather than entire password put onto clipboard (recommended no more than 3)
+HELP_STR = """
+Command list:
+set <name> <password>: Set/update the password for a site name
+get <name>: Copy a password to clipboard
+print <name>: Print a password to stdout
+comment <name> <new comment>: Set the comment for a site name
+list: List all site names
+delete <name>: Delete a password for a site name
+setmainpw <new password>: Change the main password
+"""
 
 def readSalt() -> str:
     if (isFileEmpty('salt')): #generate new salt
@@ -103,7 +112,7 @@ if __name__ == "__main__":
     else: 
         vals, fernet = tryPassword(nacl)
         if (not with_sysargs): print("Password accepted!")
-    if (not with_sysargs): print(HELP_STR)
+    if (not with_sysargs): print("Type ? for a list of commands")
     first = True
 
     while first or not with_sysargs:
@@ -112,7 +121,8 @@ if __name__ == "__main__":
         if (len(args) == 0): continue
         args[0] = args[0].lower().replace('-', '')
 
-        if (args[0] == 'list'):
+        if (args[0] == '?' or args[0] == 'help'): print(HELP_STR)
+        elif (args[0] == 'list'):
             keys = vals.keys()
             print("%s password key(s):" % len(keys))
             for key in keys: print("- %s" % key)
@@ -157,6 +167,22 @@ if __name__ == "__main__":
             del vals[key]
             writePasswords(vals, fernet)
             print("Deleted %s!" % key)
+
+        elif (args[0] == 'setmainpw' or args[0] == 'passwd'):
+            if (len(args) < 2): 
+                print("Change the main password. Usage: passwd <new password>")
+                continue
+            print("Confirm new password: %s" % args[1])
+            while True:
+                confirm = input("[Y/n]: ").lower()
+                if (confirm == 'y' or confirm == 'yes'):
+                    fernet = getFernet(nacl, args[1])
+                    writePasswords(vals, fernet)
+                    print("Password updated!")
+                    break
+                elif (confirm == 'n' or confirm == 'no'):
+                    print("Operation cancelled.")
+                    break
         
         elif (args[0] == 'exit' or args[0] == 'quit'): break
         else: printPw(args[0].lower(), vals, copy=True)

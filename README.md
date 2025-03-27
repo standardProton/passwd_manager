@@ -15,6 +15,7 @@ A salt will automatically be generated in the `salt` file, and the encrypted dat
 | set \<name\> \<password\> | Updates the password for a site name |
 | comment \<name\> \<new comment\> | Sets the comment for a site name, useful for any additional info to store |
 | delete \<name\> | Remove a site name from password storage |
+| setmainpw \<new password\> | Change the main password |
 | list | List all entered site names |
 
 The main password must be entered first before any of these commands can be accessed.
