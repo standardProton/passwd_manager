@@ -1,8 +1,9 @@
-import os, hashlib, base64, random, json, sys, pyperclip
+import os, hashlib, base64, random, json, sys, pyperclip, secrets
 from cryptography.fernet import Fernet
 from getpass import getpass
 
 SECURITY_CHARS = 0 #the number of chars at the end of pw to print to console, rather than entire password put onto clipboard (recommended no more than 3)
+GENERATE_LENGTH = 24
 HELP_STR = """
 Command list:
 set <name> <password>: Set/update the password for a site name
@@ -11,6 +12,7 @@ print <name>: Print a password to stdout
 comment <name> <new comment>: Set the comment for a site name
 list: List all site names
 delete <name>: Delete a password for a site name
+generate <name>: Create a new password for site
 setmainpw <new password>: Change the main password
 """
 
@@ -167,6 +169,21 @@ if __name__ == "__main__":
             del vals[key]
             writePasswords(vals, fernet)
             print("Deleted %s!" % key)
+
+        elif (args[0] == 'generate' or args[0] == 'gen'):
+            if (len(args) < 2):
+                print("Generate a password for a new site. Usage: generate <name>")
+                continue
+            key = args[1].lower()
+            if (key in vals):
+                print("Error: This name is already taken, use 'delete' or 'set' to change")
+                continue
+            alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()'
+            pw = ''.join([alphabet[secrets.choice(range(0, len(alphabet)))] for _ in range(GENERATE_LENGTH)])
+            vals[key] = pw
+            writePasswords(vals, fernet)
+            print("Successfully generated new password!")
+            printPw(key, vals, copy=True)
 
         elif (args[0] == 'setmainpw' or args[0] == 'passwd'):
             if (len(args) < 2): 
