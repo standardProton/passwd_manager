@@ -93,6 +93,13 @@ def setComment(key, comment, vals):
     }
     return vals, old_comments
 
+def newPw() -> str:
+    while True:
+        pw = input("Enter a new password: ")
+        pw2 = input("Re-type new password: ")
+        if (pw == pw2): return pw
+        else: print("Passwords did not match.")
+
 if __name__ == "__main__":
     with_sysargs = len(sys.argv) > 1
     if (with_sysargs and sys.argv[1].lower() == '--help'): 
@@ -104,13 +111,7 @@ if __name__ == "__main__":
     fernet = None
     if (isFileEmpty('pwstore')):
         with open("pwstore", "w") as f: pass
-        while True:
-            pw = input("Enter a new password: ")
-            print("\nConfirm new password: %s" % pw)
-            confirm = input("[Y/n]: ").lower()
-            if (confirm == "y" or confirm == "yes"):
-                fernet = getFernet(nacl, pw)
-                break
+        fernet = getFernet(nacl, newPw())
     else: 
         vals, fernet = tryPassword(nacl)
         if (not with_sysargs): print("Password accepted!")
@@ -119,6 +120,7 @@ if __name__ == "__main__":
 
     while first or not with_sysargs:
         args = sys.argv[1:] if with_sysargs else input("> ").split(" ")
+        if (len(args) == 0 or len(args[0]) == 0): continue
         first = False
         if (len(args) == 0): continue
         args[0] = args[0].lower().replace('-', '')
@@ -179,27 +181,17 @@ if __name__ == "__main__":
                 print("Error: This name is already taken, use 'delete' or 'set' to change")
                 continue
             alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890!@#$%^&*()'
-            pw = ''.join([alphabet[secrets.choice(range(0, len(alphabet)))] for _ in range(GENERATE_LENGTH)])
+            pw = ''.join([alphabet[secrets.randbelow(len(alphabet))] for _ in range(GENERATE_LENGTH)])
             vals[key] = pw
             writePasswords(vals, fernet)
             print("Successfully generated new password!")
             printPw(key, vals, copy=True)
 
         elif (args[0] == 'setmainpw' or args[0] == 'passwd'):
-            if (len(args) < 2): 
-                print("Change the main password. Usage: passwd <new password>")
-                continue
-            print("Confirm new password: %s" % args[1])
-            while True:
-                confirm = input("[Y/n]: ").lower()
-                if (confirm == 'y' or confirm == 'yes'):
-                    fernet = getFernet(nacl, args[1])
-                    writePasswords(vals, fernet)
-                    print("Password updated!")
-                    break
-                elif (confirm == 'n' or confirm == 'no'):
-                    print("Operation cancelled.")
-                    break
+            pw = newPw()
+            fernet = getFernet(nacl, pw)
+            writePasswords(vals, fernet)
+            print("Password updated!")
         
         elif (args[0] == 'exit' or args[0] == 'quit'): break
         else: printPw(args[0].lower(), vals, copy=True)
